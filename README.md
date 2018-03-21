@@ -1,4 +1,4 @@
-# GitOps Hello World Infra Staging Brigade
+# GitOps Hello World Brigade Infra Staging
 
 Second iteration of the GitOps hello world REST API infrastructure configuration for staging, using
 [Brigade](https://brigade.sh/) as the CD system.
@@ -25,9 +25,9 @@ $ helm inspect values brigade/brigade-project > values.yaml
 Modify at least these fields in the `values.yaml`:
 
 ```yaml
-project: "crowdynews/gitops-hello-world-infra-staging-brigade"
-repository: "https://github.com/crowdynews/gitops-hello-world-infra-staging-brigade"
-cloneURL: "https://github.com/crowdynews/gitops-hello-world-infra-staging-brigade.git"
+project: "crowdynews/gitops-hello-world-brigade-infra-staging"
+repository: "https://github.com/crowdynews/gitops-hello-world-brigade-infra-staging"
+cloneURL: "https://github.com/crowdynews/gitops-hello-world-brigade-infra-staging.git"
 sharedSecret: "SOME_SECRET"
 ```
 
@@ -36,25 +36,25 @@ sharedSecret: "SOME_SECRET"
 _It's recommended that Brigade is installed in it's own namespace, see the [Brigade Security Guide](https://github.com/Azure/brigade/blob/master/docs/topics/security.md) for more information._
 
 ```
-$ helm install brigade/brigade-project --namespace brigade -n gitops-hello-world-infra-staging-brigade -f values.yaml
+$ helm install brigade/brigade-project --namespace brigade -n gitops-hello-world-brigade-infra-staging -f values.yaml
 ```
 
 Check the status of the project by running:
 
 ```
-$ helm status gitops-hello-world-infra-staging-brigade
+$ helm status gitops-hello-world-brigade-infra-staging
 ```
 
 A Brigade project can be updated after changing fields in `values.yaml` by running:
 
 ```
-$ helm upgrade gitops-hello-world-infra-staging-brigade brigade/brigade-project -f values.yaml --namespace brigade
+$ helm upgrade gitops-hello-world-brigade-infra-staging brigade/brigade-project -f values.yaml --namespace brigade
 ```
 
 And deleted by running:
 
 ```
-$ helm delete gitops-hello-world-infra-staging-brigade
+$ helm delete gitops-hello-world-brigade-infra-staging
 ```
 
 ## Using the Brigade Client
@@ -65,7 +65,7 @@ to install `brig`.
 The `brigade.js` script can be run manually with the following command:
 
 ```
-$ brig run -f ./brigade.js crowdynews/gitops-hello-world-infra-staging-brigade
+$ brig run -f ./brigade.js crowdynews/gitops-hello-world-brigade-infra-staging
 ```
 
 This will output something like:
