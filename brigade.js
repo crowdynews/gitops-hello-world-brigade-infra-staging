@@ -104,10 +104,10 @@ events.on('after', (brigadeEvent, project) => {
 
   slack.storage.enabled = false;
   slack.image = 'technosophos/slack-notify';
-  slack.tasks = ['/slack-notify']
+  slack.tasks = ['/slack-notify'];
   slack.env = {
     SLACK_WEBHOOK: project.secrets.SLACK_WEBHOOK,
-    SLACK_TITLE: 'Wazzzaaaaaa!'
+    SLACK_TITLE: 'Wazzzaaaaaa!',
     SLACK_MESSAGE: `Brigade build "${
       brigadeEvent.buildID
     }"successful.\nImage "${image}" deployed to staging.`,
