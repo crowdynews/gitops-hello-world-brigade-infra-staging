@@ -65,7 +65,7 @@ to install `brig`.
 The `brigade.js` script can be run manually with the following command:
 
 ```
-$ brig run -f ./brigade.js crowdynews/gitops-hello-world-brigade-infra-staging
+$ brig run -f ./brigade.js crowdynews/gitops-hello-world-brigade-infra-staging -n brigade
 ```
 
 This will output something like:

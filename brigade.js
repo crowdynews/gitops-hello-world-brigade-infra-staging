@@ -1,54 +1,102 @@
 'use strict';
 
-const { events } = require('brigadier');
+const { events, Job, Group } = require('brigadier');
 
-events.on('exec', (event, project) => {
-  console.log('[EVENT] "exec"');
-  console.log('   event: ', event);
-  console.log('   project: ', project);
+const _hubCredentials = secrets => `
+cat << EOF > $HOME/.config/hub
+github.com:
+  - protocol: https
+    user: ${secrets.GITHUB_USERNAME}
+    oauth_token: ${secrets.GITHUB_TOKEN}
+EOF
+`;
+
+const _hubConfig = (email, name) => `
+hub config --global credential.https://github.com.helper /usr/local/bin/hub-credential-helper
+hub config --global hub.protocol https
+hub config --global user.email "${email}"
+hub config --global user.name "${name}"
+`;
+
+const _commitImage = (image, buildID) => `
+cd src
+
+cat << EOF > patch.yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: gitops-hello-world-brigade
+          image: ${image}
+EOF
+
+kubectl patch --local -o yaml \
+  -f kubernetes/deployment.yaml \
+  -p "$(cat patch.yaml)" \
+  > deployment.yaml
+
+mv deployment.yaml kubernetes/deployment.yaml
+
+hub add kubernetes/deployment.yaml
+
+hub commit -F- << EOF
+Update hello world REST API
+
+This commit updates the deployment container image to:
+  ${image}
+
+Build ID:
+  ${buildID}
+EOF
+`;
+
+const _pushCommit = cloneURL => `
+hub remote add origin ${cloneURL}
+
+hub remote show origin
+`;
+
+events.on('exec', (brigadeEvent, project) => {
+  console.log('[EVENT] "exec" - build ID: ', brigadeEvent.buildID);
 });
 
-events.on('gcr_image_push', (event, project) => {
-  const payload = JSON.parse(event.payload);
+events.on('gcr_image_push', (brigadeEvent, project) => {
+  console.log('[EVENT] "gcr_image_push" - build ID: ', brigadeEvent.buildID);
 
-  /*
-    payload: {
-      gcrContext: {
-        eventId: '78938124563234',
-        timestamp: '2018-03-15T21:06:11.814Z',
-        eventType: 'google.pubsub.topic.publish',
-        resource: {
-          service: 'pubsub.googleapis.com',
-          name: 'projects/some-gke-project/topics/gcr',
-          type: 'type.googleapis.com/google.pubsub.v1.PubsubMessage'
-        }
-      },
-      imageData: {
-        "action":"INSERT",
-        "digest":"gcr.io/some-gke-project/some-image-named@sha256:some-hash",
-        "tag":"gcr.io/some-gke-project/some-image-name:some-tag"
-      }
-    }
-  */
+  const payload = JSON.parse(brigadeEvent.payload);
+  const imageAction = payload.imageData.action; // "INSERT" or "DELETE"
+  const image = payload.imageData.tag;
 
-  console.log('[EVENT] "gcr_image_push"');
-  console.log('   build ID: ', event.buildID);
-  console.log('   worker ID: ', event.workerID);
-  console.log('   event type: ', event.type);
-  console.log('   event provider: ', event.provider);
-  console.log('   event payload GCR context: ', payload.gcrContext);
-  console.log('   event payload Image data: ', payload.imageData);
-  console.log('   project: ', project);
+  console.log('image action: ', imageAction);
+  console.log('image: ', image);
+
+  const infra = new Job('update-infra-config');
+
+  infra.image = 'gcr.io/hightowerlabs/hub';
+  infra.tasks = [
+    _hubCredentials(project.secrets),
+    _hubConfig('gitops-bot@crowdynews.com', 'GitOps Bot'),
+    _commitImage(image, brigadeEvent.buildID),
+    _pushCommit(project.repo.cloneURL)
+  ];
+
+  const deploy = new Job('deploy-to-staging');
+
+  deploy.image = 'gcr.io/cloud-builders/kubectl';
+  deploy.tasks = ['cd src', 'kubectl apply --recursive -f kubernetes'];
+
+  const pipeline = new Group();
+
+  pipeline.add(infra);
+  pipeline.add(deploy);
+
+  pipeline.runEach();
 });
 
-events.on('after', (event, project) => {
-  console.log('[EVENT] "after"');
-  console.log('   event: ', event);
-  console.log('    project: ', project);
+events.on('after', (brigadeEvent, project) => {
+  console.log('[EVENT] "after" - job done');
 });
 
-events.on('error', (event, project) => {
-  console.log('[EVENT] "error"');
-  console.log('   event: ', event);
-  console.log('   project: ', project);
+events.on('error', (brigadeEvent, project) => {
+  console.log('[EVENT] "error" - payload: ', brigadeEvent.payload);
 });
