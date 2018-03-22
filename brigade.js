@@ -53,7 +53,7 @@ EOF
 const _pushCommit = cloneURL => `
 hub remote add origin ${cloneURL}
 
-hub remote show origin
+hub push origin master
 `;
 
 events.on('exec', (brigadeEvent, project) => {
