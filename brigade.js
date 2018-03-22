@@ -72,6 +72,7 @@ events.on('gcr_image_push', (brigadeEvent, project) => {
 
   const infra = new Job('update-infra-config');
 
+  infra.storage.enabled = false;
   infra.image = 'gcr.io/hightowerlabs/hub';
   infra.tasks = [
     _hubCredentials(project.secrets),
@@ -82,6 +83,7 @@ events.on('gcr_image_push', (brigadeEvent, project) => {
 
   const deploy = new Job('deploy-to-staging');
 
+  deploy.storage.enabled = false;
   deploy.image = 'gcr.io/cloud-builders/kubectl';
   deploy.tasks = ['cd src', 'kubectl apply --recursive -f kubernetes'];
 
@@ -95,6 +97,24 @@ events.on('gcr_image_push', (brigadeEvent, project) => {
 
 events.on('after', (brigadeEvent, project) => {
   console.log('[EVENT] "after" - job done');
+
+  const payload = JSON.parse(brigadeEvent.payload);
+  const image = payload.imageData.tag;
+  const slack = new Job('slack-notify');
+
+  slack.storage.enabled = false;
+  slack.image = 'technosophos/slack-notify';
+  slack.tasks = ['/slack-notify']
+  slack.env = {
+    SLACK_WEBHOOK: project.secrets.SLACK_WEBHOOK,
+    SLACK_TITLE: 'Wazzzaaaaaa!'
+    SLACK_MESSAGE: `Brigade build "${
+      brigadeEvent.buildID
+    }"successful.\nImage "${image}" deployed to staging.`,
+    SLACK_COLOR: 'good'
+  };
+
+  slack.run();
 });
 
 events.on('error', (brigadeEvent, project) => {
