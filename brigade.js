@@ -73,7 +73,7 @@ events.on('gcr_image_push', async (brigadeEvent, project) => {
     _hubConfig('gitops-bot@crowdynews.com', 'GitOps Bot'),
     'cd src',
     _commitImage(image, brigadeEvent.buildID),
-    _pushCommit(project.repo.cloneURL),
+    _pushCommit(project.repo.cloneURL)
     // 'hub rev-parse HEAD'
   ];
 
@@ -84,7 +84,7 @@ events.on('gcr_image_push', async (brigadeEvent, project) => {
   const kashtiURL = `${project.secrets.KASHTI_URL}/#!/build/${buildID}`;
   const projectName = project.name;
   const commitURL = `${projectName}/commit/${commitSHA}`;
-  const slackJob = new Job('slack-notify');
+  const slackJob = new Job('slack-notify-update-infra');
 
   slackJob.storage.enabled = false;
   slackJob.image = 'technosophos/slack-notify';
@@ -100,7 +100,7 @@ events.on('gcr_image_push', async (brigadeEvent, project) => {
   slackJob.run();
 });
 
-events.on('push', await (brigadeEvent, project) => {
+events.on('push', async (brigadeEvent, project) => {
   console.log('[EVENT] "push" - brigade event: ', brigadeEvent);
 
   const payload = JSON.parse(brigadeEvent.payload);
@@ -118,7 +118,7 @@ events.on('push', await (brigadeEvent, project) => {
   const projectName = project.name;
   const buildID = brigadeEvent.buildID;
   const kashtiURL = `${project.secrets.KASHTI_URL}/#!/build/${buildID}`;
-  const slackJob = new Job('slack-notify');
+  const slackJob = new Job('slack-notify-deploy-staging');
 
   slackJob.storage.enabled = false;
   slackJob.image = 'technosophos/slack-notify';
