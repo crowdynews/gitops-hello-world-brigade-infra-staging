@@ -98,19 +98,18 @@ events.on('gcr_image_push', (brigadeEvent, project) => {
 events.on('after', (brigadeEvent, project) => {
   console.log('[EVENT] "after" - job done');
 
-  const payload = JSON.parse(brigadeEvent.payload);
-  const image = payload.imageData.tag;
+  const buildID = brigadeEvent.buildID;
+  const kashti = `${project.secrets.KASHTI_URL}/#!/build/${buildID}`;
+  const projectName = project.name;
   const slack = new Job('slack-notify');
 
-  slack.storage.enabled = false;
+  http: slack.storage.enabled = false;
   slack.image = 'technosophos/slack-notify';
   slack.tasks = ['/slack-notify'];
   slack.env = {
     SLACK_WEBHOOK: project.secrets.SLACK_WEBHOOK,
-    SLACK_TITLE: 'Wazzzaaaaaa!',
-    SLACK_MESSAGE: `Brigade build "${
-      brigadeEvent.buildID
-    }"successful.\nImage "${image}" deployed to staging.`,
+    SLACK_TITLE: 'Deployed to staging!',
+    SLACK_MESSAGE: `Brigade build <${kashti}|${buildID}>.\n<${projectName}|${projectName}> deployed.`,
     SLACK_COLOR: 'good'
   };
 
