@@ -54,7 +54,7 @@ hub remote add origin ${cloneURL}
 hub push origin master
 `;
 
-events.on('gcr_image_push', async (brigadeEvent, project) => {
+events.on('gcr_image_push', (brigadeEvent, project) => {
   console.log('[EVENT] "gcr_image_push" - build ID: ', brigadeEvent.buildID);
 
   const payload = JSON.parse(brigadeEvent.payload);
@@ -76,11 +76,11 @@ events.on('gcr_image_push', async (brigadeEvent, project) => {
     _pushCommit(project.repo.cloneURL)
   ];
 
-  await infraJob.run();
-
+  const projectName = project.name;
+  const projectURL = `https://${projectName}`;
+  const imageURL = `https://${image}`;
   const buildID = brigadeEvent.buildID;
   const kashtiURL = `${project.secrets.KASHTI_URL}/#!/build/${buildID}`;
-  const projectName = project.name;
   const slackJob = new Job('slack-notify-update-infra');
 
   slackJob.storage.enabled = false;
@@ -89,15 +89,21 @@ events.on('gcr_image_push', async (brigadeEvent, project) => {
   slackJob.env = {
     SLACK_WEBHOOK: project.secrets.SLACK_WEBHOOK,
     SLACK_TITLE: 'Infra Config Update',
-    SLACK_MESSAGE: `Project <${projectName}|${projectName}>\nDocker image <http://${image}|${image}>\nBrigade build <${kashtiURL}|${buildID}>`,
+    SLACK_MESSAGE: `Project <${projectURL}|${projectName}>\nDocker image <${imageURL}|${image}>\nBrigade build <${kashtiURL}|${buildID}>`,
     SLACK_COLOR: '#82aaff'
   };
 
   slackJob.run();
+
+  const pipeline = new Group();
+
+  pipeline.add(infraJob);
+  pipeline.add(slackJob);
+  pipeline.runEach();
 });
 
-events.on('push', async (brigadeEvent, project) => {
-  console.log('[EVENT] "push" - brigade event: ', brigadeEvent);
+events.on('push', (brigadeEvent, project) => {
+  console.log('[EVENT] "push" - build ID: ', brigadeEvent.buildID);
 
   const deployJob = new Job('deploy-to-staging');
 
@@ -105,12 +111,11 @@ events.on('push', async (brigadeEvent, project) => {
   deployJob.image = 'gcr.io/cloud-builders/kubectl';
   deployJob.tasks = ['cd src', 'kubectl apply --recursive -f kubernetes'];
 
-  await deployJob.run();
-
   const projectName = project.name;
+  const projectURL = `https://${projectName}`;
   const commitSHA = brigadeEvent.revision.commit;
   const shortCommitSHA = commitSHA.substr(0, 7);
-  const commitURL = `${projectName}/commit/${commitSHA}`;
+  const commitURL = `https://${projectName}/commit/${commitSHA}`;
   const buildID = brigadeEvent.buildID;
   const kashtiURL = `${project.secrets.KASHTI_URL}/#!/build/${buildID}`;
   const slackJob = new Job('slack-notify-deploy-staging');
@@ -121,11 +126,15 @@ events.on('push', async (brigadeEvent, project) => {
   slackJob.env = {
     SLACK_WEBHOOK: project.secrets.SLACK_WEBHOOK,
     SLACK_TITLE: 'Deploy to Staging',
-    SLACK_MESSAGE: `Project <${projectName}|${projectName}>\nCommit <${commitURL}|${shortCommitSHA}>\nBrigade build <${kashtiURL}|${buildID}>`,
+    SLACK_MESSAGE: `Project <${projectURL}|${projectName}>\nCommit <${commitURL}|${shortCommitSHA}>\nBrigade build <${kashtiURL}|${buildID}>`,
     SLACK_COLOR: '#c792ea'
   };
 
-  await slackJob.run();
+  const pipeline = new Group();
+
+  pipeline.add(deployJob);
+  pipeline.add(slackJob);
+  pipeline.runEach();
 });
 
 events.on('error', (brigadeEvent, project) => {
