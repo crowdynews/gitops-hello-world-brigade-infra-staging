@@ -19,8 +19,6 @@ hub config --global user.name "${name}"
 `;
 
 const _commitImage = (image, buildID) => `
-cd src
-
 cat << EOF > patch.yaml
 spec:
   template:
@@ -56,11 +54,7 @@ hub remote add origin ${cloneURL}
 hub push origin master
 `;
 
-events.on('exec', (brigadeEvent, project) => {
-  console.log('[EVENT] "exec" - build ID: ', brigadeEvent.buildID);
-});
-
-events.on('gcr_image_push', (brigadeEvent, project) => {
+events.on('gcr_image_push', async (brigadeEvent, project) => {
   console.log('[EVENT] "gcr_image_push" - build ID: ', brigadeEvent.buildID);
 
   const payload = JSON.parse(brigadeEvent.payload);
@@ -70,52 +64,56 @@ events.on('gcr_image_push', (brigadeEvent, project) => {
   console.log('image action: ', imageAction);
   console.log('image: ', image);
 
-  const infra = new Job('update-infra-config');
+  const infraJob = new Job('update-infra-config');
 
-  infra.storage.enabled = false;
-  infra.image = 'gcr.io/hightowerlabs/hub';
-  infra.tasks = [
+  infraJob.storage.enabled = false;
+  infraJob.image = 'gcr.io/hightowerlabs/hub';
+  infraJob.tasks = [
     _hubCredentials(project.secrets),
     _hubConfig('gitops-bot@crowdynews.com', 'GitOps Bot'),
+    'cd src',
     _commitImage(image, brigadeEvent.buildID),
-    _pushCommit(project.repo.cloneURL)
+    _pushCommit(project.repo.cloneURL),
+    'hub rev-parse HEAD'
   ];
 
-  const deploy = new Job('deploy-to-staging');
-
-  deploy.storage.enabled = false;
-  deploy.image = 'gcr.io/cloud-builders/kubectl';
-  deploy.tasks = ['cd src', 'kubectl apply --recursive -f kubernetes'];
-
-  const pipeline = new Group();
-
-  pipeline.add(infra);
-  pipeline.add(deploy);
-
-  pipeline.runEach();
-});
-
-events.on('after', (brigadeEvent, project) => {
-  console.log('[EVENT] "after" - job done');
-
+  const commitSHA = await infraJob.run().then(result => result.toString().trim());
+  const shortCommitSHA = commitSHA.substr(0, 7);
   const buildID = brigadeEvent.buildID;
-  const kashti = `${project.secrets.KASHTI_URL}/#!/build/${buildID}`;
+  const kashtiURL = `${project.secrets.KASHTI_URL}/#!/build/${buildID}`;
   const projectName = project.name;
-  const slack = new Job('slack-notify');
+  const commitURL = `${projectName}/commit/${commitSHA}`;
+  const slackJob = new Job('slack-notify');
 
-  http: slack.storage.enabled = false;
-  slack.image = 'technosophos/slack-notify';
-  slack.tasks = ['/slack-notify'];
-  slack.env = {
+  slackJob.storage.enabled = false;
+  slackJob.image = 'technosophos/slack-notify';
+  slackJob.tasks = ['/slack-notify'];
+  slackJob.env = {
     SLACK_WEBHOOK: project.secrets.SLACK_WEBHOOK,
-    SLACK_TITLE: 'Deployed to staging!',
-    SLACK_MESSAGE: `Brigade build <${kashti}|${buildID}>.\n<${projectName}|${projectName}> deployed.`,
+    SLACK_TITLE: 'Infra Config Update',
+    SLACK_MESSAGE: `Project <${projectName}|${projectName}>\nDocker image <http://${image}|${image}>\nCommit <${commitURL}|${shortCommitSHA}>\nBrigade build <${kashtiURL}|${buildID}>`,
     SLACK_COLOR: 'good'
   };
 
-  slack.run();
+  await slackJob.run();
+});
+
+events.on('push', (brigadeEvent, project) => {
+  console.log('[EVENT] "push" - brigade event: ', brigadeEvent);
+
+  const payload = JSON.parse(brigadeEvent.payload);
+
+  console.log('payload: ', payload);
+
+  const deployJob = new Job('deploy-to-staging');
+
+  deployJob.storage.enabled = false;
+  deployJob.image = 'gcr.io/cloud-builders/kubectl';
+  deployJob.tasks = ['cd src', 'kubectl apply --recursive -f kubernetes'];
+
+  deployJob.run();
 });
 
 events.on('error', (brigadeEvent, project) => {
-  console.log('[EVENT] "error" - payload: ', brigadeEvent.payload);
+  console.log('[EVENT] "error" - brigade event: ', brigadeEvent);
 });
