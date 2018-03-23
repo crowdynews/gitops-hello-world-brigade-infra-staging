@@ -93,8 +93,6 @@ events.on('gcr_image_push', (brigadeEvent, project) => {
     SLACK_COLOR: '#82aaff'
   };
 
-  slackJob.run();
-
   const pipeline = new Group();
 
   pipeline.add(infraJob);
