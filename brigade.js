@@ -64,7 +64,7 @@ events.on('gcr_image_push', (brigadeEvent, project) => {
   console.log('image action: ', imageAction);
   console.log('image: ', image);
 
-  const infraJob = new Job('update-infra-config');
+  const infraJob = new Job('update-infra-config-staging');
 
   infraJob.storage.enabled = false;
   infraJob.image = 'gcr.io/hightowerlabs/hub';
@@ -81,7 +81,7 @@ events.on('gcr_image_push', (brigadeEvent, project) => {
   const imageURL = `https://${image}`;
   const buildID = brigadeEvent.buildID;
   const kashtiURL = `${project.secrets.KASHTI_URL}/#!/build/${buildID}`;
-  const slackJob = new Job('slack-notify-update-infra');
+  const slackJob = new Job('slack-notify-update-infra-staging');
 
   slackJob.storage.enabled = false;
   slackJob.image = 'technosophos/slack-notify';
@@ -103,6 +103,16 @@ events.on('gcr_image_push', (brigadeEvent, project) => {
 events.on('push', (brigadeEvent, project) => {
   console.log('[EVENT] "push" - build ID: ', brigadeEvent.buildID);
 
+  const payload = JSON.parse(brigadeEvent.payload);
+  const branch = payload.ref.substring(11);
+
+  console.log('branch: ', branch);
+
+  if (branch !== 'master') {
+    // ONLY deploy when pushed to master
+    return;
+  }
+
   const deployJob = new Job('deploy-to-staging');
 
   deployJob.storage.enabled = false;
@@ -123,7 +133,7 @@ events.on('push', (brigadeEvent, project) => {
   slackJob.tasks = ['/slack-notify'];
   slackJob.env = {
     SLACK_WEBHOOK: project.secrets.SLACK_WEBHOOK,
-    SLACK_TITLE: 'Deploy to Staging',
+    SLACK_TITLE: 'Deploy Staging',
     SLACK_MESSAGE: `Project <${projectURL}|${projectName}>\nCommit <${commitURL}|${shortCommitSHA}>\nBuild <${kashtiURL}|${buildID}>`,
     SLACK_COLOR: '#c792ea'
   };
