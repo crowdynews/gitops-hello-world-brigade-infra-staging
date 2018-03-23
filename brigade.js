@@ -89,7 +89,7 @@ events.on('gcr_image_push', (brigadeEvent, project) => {
   slackJob.env = {
     SLACK_WEBHOOK: project.secrets.SLACK_WEBHOOK,
     SLACK_TITLE: 'Infra Config Update',
-    SLACK_MESSAGE: `Project <${projectURL}|${projectName}>\nDocker image <${imageURL}|${image}>\nBrigade build <${kashtiURL}|${buildID}>`,
+    SLACK_MESSAGE: `Project <${projectURL}|${projectName}>\nDocker image <${imageURL}|${image}>\nBuild <${kashtiURL}|${buildID}>`,
     SLACK_COLOR: '#82aaff'
   };
 
@@ -126,7 +126,7 @@ events.on('push', (brigadeEvent, project) => {
   slackJob.env = {
     SLACK_WEBHOOK: project.secrets.SLACK_WEBHOOK,
     SLACK_TITLE: 'Deploy to Staging',
-    SLACK_MESSAGE: `Project <${projectURL}|${projectName}>\nCommit <${commitURL}|${shortCommitSHA}>\nBrigade build <${kashtiURL}|${buildID}>`,
+    SLACK_MESSAGE: `Project <${projectURL}|${projectName}>\nCommit <${commitURL}|${shortCommitSHA}>\nBuild <${kashtiURL}|${buildID}>`,
     SLACK_COLOR: '#c792ea'
   };
 
